@@ -3,41 +3,24 @@
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 #include <imgui/backends/imgui_impl_glfw.h>
+#include "Shader.h"
 #include <iostream>
-
-enum shaders { vertex, fragment };
+#include <utility>
 
 struct setting {
     GLint width, height;
     const char windowName[];
 };
 
-GLuint* CreateShader(shaders shadersType, const GLchar* srcShader);
-GLuint* CreateShaderProgram(GLuint* vertexShader, GLuint* fragmentShader);
 void WindowResize(GLFWwindow* pWindow, GLint width, GLint height);
 void KeyCallback(GLFWwindow* pWindow, GLint key, GLint scancode, GLint action, GLint mode);
 
 setting windowSetting = { 640,480,"Edga Engine" };
 
-int main(void) {
-
-    const GLchar* vertexSrcShader =
-        "#version 460 core\n"
-        "layout(location = 0) in vec3 position;\n"
-        "void main() {\n"
-        "gl_Position = vec4(position.x, position.y, position.z, 1.0);}\0";
-
-    const GLchar* fragmentSrcShaderOrange =
-        "#version 460 core\n"
-        "out vec4 color;\n"
-        "void main() {\n"
-        "color = vec4(1.0f, 0.5f, 0.2f, 1.0f);}\0";
-
-    const GLchar* fragmentSrcShaderGreen =
-        "#version 460 core\n"
-        "out vec4 color;\n"
-        "void main() {\n"
-        "color = vec4(0.0f, 0.5f, 0.2f, 1.0f);}\0";
+int main(int argc, char* argv[]) {
+    std::string path = argv[0];
+    path = path.substr(0, path.find_last_of("\\"));
+    std::cout << path << "\n";
 
     bool polygonMode = false;
 
@@ -69,7 +52,7 @@ int main(void) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark(); // you can also use ImGui::StyleColorsClassic();
+    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(pWindow, true);
     ImGui_ImplOpenGL3_Init();
 
@@ -77,22 +60,26 @@ int main(void) {
     std::cout << "Video card:" << glGetString(GL_RENDERER) << "\n";
     std::cout << "OpenGL version:" << glGetString(GL_VERSION) << "\n";
 
-    GLfloat backgroundColor[4] = { 0,1,0,0 };
+    GLint nrAttributes;
+    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &nrAttributes);
+    std::cout << "Maximum nr of vertex attributes supported: " << nrAttributes << std::endl;
+
+    GLfloat backgroundColor[4] = { 1,1,0,0 };
     glClearColor(backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3]);
 
     GLfloat verticesOne[] = {
-         0.8f,  0.8f, 0.0f,
-         0.8f, -0.8f, 0.0f,
-        -0.8f, -0.8f, 0.0f,
-        -0.8f,  0.8f, 0.0f,
+         0.8f,  0.8f, 0.0f, 0.0f, 1.0f, 0.0f,
+         0.8f, -0.8f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.8f, -0.8f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.8f,  0.8f, 0.0f, 0.0f, 1.0f, 0.0f,
     };
 
 
     GLfloat verticesTwo[] = {
-     0.4f,  0.4f, 0.0f,
-     0.4f, -0.4f, 0.0f,
-    -0.4f, -0.4f, 0.0f,
-    -0.4f,  0.4f, 0.0f,
+     0.4f,  0.4f, 0.0f, 1.0f, 0.0f, 0.0f,
+     0.4f, -0.4f, 0.0f, 0.0f, 1.0f, 0.0f,
+    -0.4f, -0.4f, 0.0f, 1.0f, 0.0f, 0.0f,
+    -0.4f,  0.4f, 0.0f, 0.0f, 0.0f, 1.0f,
     };
 
     GLuint indices[] = {
@@ -119,20 +106,27 @@ int main(void) {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
         glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
         glBindVertexArray(0);
     }
+    
+    Shader shader_one(
+        std::pair<const char, std::string> {'v',"vertex.glsl"}, 
+        std::pair<const char, std::string> {'f', "fragment2.glsl"}
+    );
 
-    GLuint* vertexShader = CreateShader(shaders::vertex, vertexSrcShader);
-    GLuint* fragmentShaderOrange = CreateShader(shaders::fragment, fragmentSrcShaderOrange);
-    GLuint* fragmentShaderGreen = CreateShader(shaders::fragment, fragmentSrcShaderGreen);
-    GLuint* shaderProgramOrange = CreateShaderProgram(vertexShader, fragmentShaderOrange);
-    GLuint* shaderProgramGreen = CreateShaderProgram(vertexShader, fragmentShaderGreen);
+    Shader shader_two(
+        std::pair<const char, std::string> {'v', "vertex.glsl"},
+        std::pair<const char, std::string> {'f', "fragment.glsl"}
+    );
 
-    glDeleteShader(*vertexShader);
-    glDeleteShader(*fragmentShaderOrange);
-    glDeleteShader(*fragmentShaderGreen);
+
+    GLint fragmentLocationUniform = glGetUniformLocation(shader_two.shaderProgram, "effect");
+
+
 
 
     while (!glfwWindowShouldClose(pWindow)) {
@@ -151,15 +145,21 @@ int main(void) {
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        glUseProgram(*shaderProgramOrange);
-        glBindVertexArray(VAO[0]);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-
-        glUseProgram(*shaderProgramGreen);
-        glBindVertexArray(VAO[1]);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        for (int i = 0; i < 2; ++i) {
+            if (i == 0) {
+                shader_one.Use();
+                glBindVertexArray(VAO[i]);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+            }
+            else {
+                shader_two.Use();
+                glUniform1f(fragmentLocationUniform, (sin(glfwGetTime())) + 0.5);
+                glBindVertexArray(VAO[i]);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+            }
+        }
 
         ImGui::Begin("Settings");
         ImGui::Checkbox("glPolygonMode", &polygonMode);
@@ -180,9 +180,6 @@ int main(void) {
         glDeleteBuffers(1, &EBO[i]);
     }
 
-    glDeleteProgram(*shaderProgramGreen);
-    glDeleteProgram(*shaderProgramOrange);
-
     glfwTerminate();
     return 0;
 }
@@ -199,63 +196,4 @@ void KeyCallback(GLFWwindow* pWindow, GLint key, GLint scancode, GLint action, G
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(pWindow, GL_TRUE);
     }
-}
-
-GLuint* CreateShader(shaders shaderType, const GLchar *srcShader) {
-
-    GLuint* shader = new GLuint;
-    GLint success;
-    GLchar infoLog[1024];
-
-
-    switch (shaderType) {
-    case shaders::fragment:
-        std::cout << "Compile fragment shader\n";
-        *shader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(*shader, 1, &srcShader, NULL);
-        glCompileShader(*shader);
-        break;
-    case shaders::vertex:
-        std::cout << "Compile vertex shader\n";
-        *shader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(*shader, 1, &srcShader, NULL);
-        glCompileShader(*shader);
-        break;
-    default:
-        std::cout << "Error, unknown shader type\n";
-        delete shader;
-        shader = nullptr;
-        break;
-
-        if (shader) {
-            glGetShaderiv(*shader, GL_COMPILE_STATUS, &success);
-            if (!success) {
-                glGetShaderInfoLog(*shader, 1024, NULL, infoLog);
-                std::cout << "Error compile shader!\n" << infoLog << "\n";
-            }
-        }
-    }
-    return shader;
-}
-
-GLuint* CreateShaderProgram(GLuint* vertexShader, GLuint* fragmentShader) {
-
-    GLuint* shaderProgram = new GLuint;
-    GLint success;
-    GLchar infoLog[1024];
-
-    *shaderProgram = glCreateProgram();
-    glAttachShader(*shaderProgram, *vertexShader);
-    glAttachShader(*shaderProgram, *fragmentShader);
-    glLinkProgram(*shaderProgram);
-    glGetProgramiv(*shaderProgram, GL_LINK_STATUS, &success);
-
-    if (!success) {
-        glGetProgramInfoLog(*shaderProgram, 1024, NULL, infoLog);
-        std::cout << "Error linked shader program!\n" << infoLog << "\n";
-        delete shaderProgram;
-        shaderProgram = nullptr;
-    }
-
-    return shaderProgram;
 }

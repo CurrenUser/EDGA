@@ -19,8 +19,13 @@ SET(SOURCE_IMGUI
 )
 
 
-project(${PROJECT_NANE})
-add_executable(${PROJECT_NANE} src/main.cpp)
+project(${PROJECT_NANE}) 
+
+add_executable( ${PROJECT_NANE} 
+    src/main.cpp
+    src/Shader.h
+    src/Shader.cpp
+)
 
 
 add_subdirectory(external/glfw)
@@ -35,3 +40,13 @@ target_include_directories(ImGui PUBLIC external/)
 target_include_directories(ImGui PUBLIC external/imgui)
 target_link_libraries(ImGui PRIVATE glad glfw)
 target_link_libraries(${PROJECT_NANE} PRIVATE ImGui glfw glad)
+
+set_target_properties(${PROJECT_NANE} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
+
+add_custom_command(TARGET ${PROJECT_NANE} POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   ${CMAKE_SOURCE_DIR}/glsl $<TARGET_FILE_DIR:${PROJECT_NANE}>)
+
+add_custom_command(TARGET ${PROJECT_NANE} POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   ${CMAKE_SOURCE_DIR}/glsl ${CMAKE_SOURCE_DIR}/build)
